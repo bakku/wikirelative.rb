@@ -25,17 +25,27 @@ DESTINATION_REGEX = Regexp.new(Regexp.escape(destination))
 # visited links array
 VISITED = []
 
+# next links array
+LINK_QUEUE = []
+
 unless WIKI_REGEXP =~ start && WIKI_REGEXP =~ destination 
   puts "You didn't pass wikipedia links as arguments. NOTE: It has to be the english wikipedia."
   exit 1
 end
 
 # startup stuff
-next_link = start
+LINK_QUEUE << start
 steps = 0
 beginning_time = Time.now
 
-while !next_link.empty?
+while !LINK_QUEUE.empty?
+  
+  # next element from queue
+  next_link = LINK_QUEUE.shift
+  
+  # add base url if it does not exist there yet
+  next_link = "#{BASE_URL}#{next_link}" unless next_link.start_with?(BASE_URL)
+  
   if DESTINATION_REGEX =~ next_link
     puts "FOUND! #{next_link}"
     puts "Needed steps: #{steps}"
@@ -45,39 +55,21 @@ while !next_link.empty?
   
   # only use links in body with href
   puts "Checking #{next_link}"
-  links = Nokogiri::HTML(open("#{next_link}")).css('body a[href^="/wiki/"]')
   
-  # reset
-  next_link = ""
-  
-  # determine link
-  links.each do |link|
-    # already visited?
-    if VISITED.include? link['href']
-      next
-      
-    # is it a wiki site defined as in the whitelist ?
-    elsif WIKI_PAGE_REGEXP =~ link['href']
-      next_link = link['href']
-      VISITED << next_link
-      next_link = "#{BASE_URL}#{next_link}"
-
-      # check if link works. if not choose next one      
-      begin
-        open(next_link)
-        
-        # increment steps
-        steps = steps + 1
-        
-        # link worked. proceed with this link
-        break
-      rescue
-        next
-      end
+  begin
+    links = Nokogiri::HTML(open("#{next_link}")).css('body a[href^="/wiki/"]')
+    
+    # push all links in queue if they have not been visited and the regexp fits
+    links.each do |link|
+      LINK_QUEUE << link['href'] if !(VISITED.include? link['href']) && WIKI_PAGE_REGEXP =~ link['href']
     end
+    
+    steps = steps + 1
+  rescue
+    puts "#{next_link} was unreachable. Seems like this wiki page is down"
   end
 end
 
 puts "Found no way :("
-
-
+puts "Tries: #{steps}"
+puts "Time spent searching: #{(Time.now - beginning_time)}"
