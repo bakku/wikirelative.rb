@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
 
+# add local files to load path
+$:.unshift File.dirname(__FILE__)
+
+require 'lib/unique_queue'
 require 'open-uri'
 require 'nokogiri'
 
@@ -59,9 +63,9 @@ while !LINK_QUEUE.empty?
   begin
     links = Nokogiri::HTML(open("#{next_link}")).css('body a[href^="/wiki/"]')
     
-    # push all links in queue if they have not been visited and the regexp fits
+    # push all links in queue if they have not been visited, the regexp fits and the element is not in the queue yet
     links.each do |link|
-      LINK_QUEUE << link['href'] if !(VISITED.include? link['href']) && WIKI_PAGE_REGEXP =~ link['href']
+      LINK_QUEUE.unique_push(link['href']) if !(VISITED.include? link['href']) && WIKI_PAGE_REGEXP =~ link['href']
     end
     
     steps = steps + 1
